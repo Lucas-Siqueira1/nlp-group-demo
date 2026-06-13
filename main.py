@@ -12,11 +12,6 @@ from openinference.instrumentation.google_adk import GoogleADKInstrumentor
 from agents.root_agent import root_agent
 
 load_dotenv()
-warnings.filterwarnings(
-    "ignore",
-    message=r"\[EXPERIMENTAL\] feature FeatureName\.JSON_SCHEMA_FOR_FUNC_DECL is enabled\.",
-    category=UserWarning,
-)
 
 langfuse = get_client()
 
