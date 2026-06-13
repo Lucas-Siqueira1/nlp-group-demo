@@ -60,13 +60,14 @@ async def run(user_input: str, session_id: str = "demo-session"):
 def run_evaluation():
     dataset = langfuse.get_dataset("golden-dataset")
 
-    def task(*, item, **kwargs):
-        return asyncio.run(run(item.input, session_id=f"eval-{item.id}"))
+    async def task(*, item, **kwargs):
+        return await run(item.input, session_id=f"eval-{item.id}")
 
     dataset.run_experiment(
         name="nlp-demo-eval",
         task=task,
-        evaluators=[quality_eval, similarity_eval]
+        evaluators=[quality_eval, similarity_eval],
+        max_concurrency=1
     )
 
 def upload_dataset():

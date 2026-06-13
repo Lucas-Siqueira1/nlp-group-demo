@@ -1,13 +1,16 @@
 import os
+import re
 from langfuse.experiment import Evaluation
 from openai import OpenAI
 
-client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
-    base_url="https://api.groq.com/openai/v1"
-)
+def get_client():
+    return OpenAI(
+        api_key=os.getenv("GROQ_API_KEY"),
+        base_url="https://api.groq.com/openai/v1"
+    )
 
 def quality_eval(*, input, output, **kwargs):
+    client = get_client()
     prompt = f"""Avalie a qualidade da resposta abaixo para uma pergunta de saúde.
                 Retorne APENAS um número entre 0.0 e 1.0, onde:
                 - 1.0 = resposta clara, precisa e recomenda consulta médica quando necessário
@@ -27,11 +30,15 @@ def quality_eval(*, input, output, **kwargs):
         messages=[{"role": "user", "content": prompt}]
     )
 
-    score = float(response.choices[0].message.content.strip())
+    raw = response.choices[0].message.content.strip()
+    match = re.search(r"0\.\d+|1\.0|0\.0", raw)
+    score = float(match.group()) if match else 0.5
+
     return Evaluation(name="quality", value=score)
 
 
 def similarity_eval(*, input, output, expected_output, **kwargs):
+    client = get_client()
     if not expected_output:
         return Evaluation(name="similarity", value=0.0, comment="Sem resposta esperada para comparar")
     
@@ -54,5 +61,8 @@ def similarity_eval(*, input, output, expected_output, **kwargs):
         messages=[{"role": "user", "content": prompt}]
     )
 
-    score = float(response.choices[0].message.content.strip())
+    raw = response.choices[0].message.content.strip()
+    match = re.search(r"0\.\d+|1\.0|0\.0", raw)
+    score = float(match.group()) if match else 0.5
+
     return Evaluation(name="similarity", value=score)
