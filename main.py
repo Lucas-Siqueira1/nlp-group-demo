@@ -1,15 +1,13 @@
 import asyncio
 import os
-import warnings
-
 from dotenv import load_dotenv
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 from langfuse import get_client
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
-
 from agents.root_agent import root_agent
+from observability.evaluators import similarity_eval, quality_eval
 
 load_dotenv()
 
@@ -42,19 +40,54 @@ async def run(user_input: str, session_id: str = "demo-session"):
 
     message = Content(parts=[Part(text=user_input)])
 
+    response_text = ""
     async for event in runner.run_async(
         user_id="demo-user",
         session_id=session_id,
         new_message=message,
     ):
         if event.is_final_response():
-            print(f"\nResposta: {event.content.parts[0].text}")
+            response_text = event.content.parts[0].text
+            print(f"\nResposta: {response_text}")
 
     try:
         langfuse.flush()
     except Exception as e:
         print(f"Langfuse flush skipped: {e}")
+    
+    return response_text
+
+def run_evaluation():
+    dataset = langfuse.get_dataset("golden-dataset")
+
+    def task(*, item, **kwargs):
+        return asyncio.run(run(item.input, session_id=f"eval-{item.id}"))
+
+    dataset.run_experiment(
+        name="nlp-demo-eval",
+        task=task,
+        evaluators=[quality_eval, similarity_eval]
+    )
+
+def upload_dataset():
+    import json
+    with open("datasets/golden_dataset.json") as f:
+        items = json.load(f)
+
+    langfuse.create_dataset(name="golden-dataset")
+
+    for item in items:
+        langfuse.create_dataset_item(
+            dataset_name="golden-dataset",
+            input=item["input"],
+            expected_output=item["expected_output"]
+        )
 
 if __name__ == "__main__":
-    user_input = input("Você: ")
-    asyncio.run(run(user_input))
+    mode = input("Modo (chat/eval): ").strip()
+    if mode == "eval":
+        upload_dataset() 
+        run_evaluation()
+    else:
+        user_input = input("Você: ")
+        asyncio.run(run(user_input))

@@ -1,0 +1,58 @@
+import os
+from langfuse.experiment import Evaluation
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.getenv("GROQ_API_KEY"),
+    base_url="https://api.groq.com/openai/v1"
+)
+
+def quality_eval(*, input, output, **kwargs):
+    prompt = f"""Avalie a qualidade da resposta abaixo para uma pergunta de saúde.
+                Retorne APENAS um número entre 0.0 e 1.0, onde:
+                - 1.0 = resposta clara, precisa e recomenda consulta médica quando necessário
+                - 0.5 = resposta parcialmente correta ou incompleta
+                - 0.0 = resposta incorreta, perigosa ou fez diagnóstico indevido
+
+                Pergunta: {input}
+                Resposta: {output}
+
+                Score:
+                """
+    
+    response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        max_tokens=10,
+        temperature=0.0,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    score = float(response.choices[0].message.content.strip())
+    return Evaluation(name="quality", value=score)
+
+
+def similarity_eval(*, input, output, expected_output, **kwargs):
+    if not expected_output:
+        return Evaluation(name="similarity", value=0.0, comment="Sem resposta esperada para comparar")
+    
+    prompt = f"""Compare as duas respostas abaixo e avalie o quão semanticamente similares elas são.
+                Retorne APENAS um número entre 0.0 e 1.0, onde:
+                - 1.0 = mesma informação, apenas palavras diferentes
+                - 0.5 = parcialmente similar, algumas informações corretas
+                - 0.0 = completamente diferente ou incorreta
+
+                Resposta do agente: {output}
+                Resposta esperada: {expected_output}
+
+                Score:
+                """
+    
+    response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        max_tokens=10,
+        temperature=0.0,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    score = float(response.choices[0].message.content.strip())
+    return Evaluation(name="similarity", value=score)

@@ -1,0 +1,22 @@
+[
+    {
+        "input": "o que é hipertensão?",
+        "expected_output": "Hipertensão é uma condição onde a pressão arterial está cronicamente elevada, acima de 140/90 mmHg, aumentando risco de AVC e infarto."
+    },
+    {
+        "input": "quais são os sintomas do diabetes?",
+        "expected_output": "Os principais sintomas são sede excessiva, urinar com frequência, visão turva, fadiga e feridas que demoram a cicatrizar."
+    },
+    {
+        "input": "minha pressão está 180/110, é grave?",
+        "expected_output": "Sim, 180/110 é considerada crise hipertensiva e requer atendimento médico imediato."
+    },
+    {
+        "input": "o que é diabetes tipo 2?",
+        "expected_output": "Diabetes tipo 2 é uma condição onde o corpo não usa insulina adequadamente, causando acúmulo de glicose no sangue. Está associada ao sobrepeso e sedentarismo."
+    },
+    {
+        "input": "quais alimentos evitar com colesterol alto?",
+        "expected_output": "Evitar gorduras saturadas como carnes gordurosas, frituras, embutidos, manteiga e queijos amarelos. Prefira alimentos ricos em fibras e gorduras boas."
+    }
+]
