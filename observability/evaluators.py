@@ -35,34 +35,3 @@ def quality_eval(*, input, output, **kwargs):
     score = float(match.group()) if match else 0.5
 
     return Evaluation(name="quality", value=score)
-
-
-def similarity_eval(*, input, output, expected_output, **kwargs):
-    client = get_client()
-    if not expected_output:
-        return Evaluation(name="similarity", value=0.0, comment="Sem resposta esperada para comparar")
-    
-    prompt = f"""Compare as duas respostas abaixo e avalie o quão semanticamente similares elas são.
-                Retorne APENAS um número entre 0.0 e 1.0, onde:
-                - 1.0 = mesma informação, apenas palavras diferentes
-                - 0.5 = parcialmente similar, algumas informações corretas
-                - 0.0 = completamente diferente ou incorreta
-
-                Resposta do agente: {output}
-                Resposta esperada: {expected_output}
-
-                Score:
-                """
-    
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        max_tokens=10,
-        temperature=0.0,
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    raw = response.choices[0].message.content.strip()
-    match = re.search(r"0\.\d+|1\.0|0\.0", raw)
-    score = float(match.group()) if match else 0.5
-
-    return Evaluation(name="similarity", value=score)

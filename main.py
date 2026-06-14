@@ -6,8 +6,9 @@ from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 from langfuse import get_client
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
+from opentelemetry import trace
 from agents.root_agent import root_agent
-from observability.evaluators import similarity_eval, quality_eval
+from observability.evaluators import quality_eval
 
 load_dotenv()
 
@@ -23,6 +24,7 @@ except Exception as e:
 
 if os.getenv("ENABLE_ADK_TRACING") == "1":
     GoogleADKInstrumentor().instrument()
+
 
 async def run(user_input: str, session_id: str = "demo-session"):
     session_service = InMemorySessionService()
@@ -41,54 +43,45 @@ async def run(user_input: str, session_id: str = "demo-session"):
     message = Content(parts=[Part(text=user_input)])
 
     response_text = ""
+    trace_id = None
+
     async for event in runner.run_async(
         user_id="demo-user",
         session_id=session_id,
         new_message=message,
     ):
+        if trace_id is None:
+            span_context = trace.get_current_span().get_span_context()
+            if span_context.trace_id != 0:
+                trace_id = format(span_context.trace_id, "032x")
+
         if event.is_final_response():
             response_text = event.content.parts[0].text
             print(f"\nResposta: {response_text}")
+            
+    try:
+        evaluation = quality_eval(input=user_input, output=response_text)
+        if trace_id:
+            langfuse.create_score(
+                trace_id=trace_id,
+                name=evaluation.name,
+                value=evaluation.value,
+                comment=evaluation.comment,
+            )
+            print(f"Score de qualidade: {evaluation.value}")
+        else:
+            print("Trace ID não encontrado, score não registrado")
+    except Exception as e:
+        print(f"Quality eval skipped: {e}")
 
     try:
         langfuse.flush()
     except Exception as e:
         print(f"Langfuse flush skipped: {e}")
-    
+
     return response_text
 
-def run_evaluation():
-    dataset = langfuse.get_dataset("golden-dataset")
-
-    async def task(*, item, **kwargs):
-        return await run(item.input, session_id=f"eval-{item.id}")
-
-    dataset.run_experiment(
-        name="nlp-demo-eval",
-        task=task,
-        evaluators=[quality_eval, similarity_eval],
-        max_concurrency=1
-    )
-
-def upload_dataset():
-    import json
-    with open("datasets/golden_dataset.json") as f:
-        items = json.load(f)
-
-    langfuse.create_dataset(name="golden-dataset")
-
-    for item in items:
-        langfuse.create_dataset_item(
-            dataset_name="golden-dataset",
-            input=item["input"],
-            expected_output=item["expected_output"]
-        )
 
 if __name__ == "__main__":
-    mode = input("Modo (chat/eval): ").strip()
-    if mode == "eval":
-        upload_dataset() 
-        run_evaluation()
-    else:
-        user_input = input("Você: ")
-        asyncio.run(run(user_input))
+    user_input = input("Você: ")
+    asyncio.run(run(user_input))
