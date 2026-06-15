@@ -55,6 +55,12 @@ async def run(user_input: str, session_id: str = "demo-session"):
             if span_context.trace_id != 0:
                 trace_id = format(span_context.trace_id, "032x")
 
+                langfuse.trace(
+                    id=trace_id,
+                    session_id=session_id,
+                    user_id="demo-user"
+                )
+
         if event.is_final_response():
             response_text = event.content.parts[0].text
             print(f"\nResposta: {response_text}")
